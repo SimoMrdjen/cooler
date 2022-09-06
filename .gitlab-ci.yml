@@ -1,0 +1,73 @@
+image: docker:dind
+
+services:
+  - docker:dind
+
+stages:
+  - build
+  - package
+  - deploy
+
+variables:  
+  DOCKER_HOST: tcp://docker:2375  
+  DOCKER_DRIVER: overlay2
+
+build:
+  stage: build
+  image: openjdk:16-alpine3.13
+  script: 
+    - ./gradlew build
+  artifacts:
+    paths:
+      - build/libs/
+  except:
+    refs:
+      - /^feature/.*$/
+
+package:
+  stage: package
+  image: docker:dind
+  services:
+    - docker:dind
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
+    - docker push $CI_REGISTRY_IMAGE:latest
+  environment:
+    name: Development
+  only:
+    refs:
+      - develop
+      - master
+  dependencies:
+      - build
+
+deploy:
+  stage: deploy
+  image: ubuntu:18.04
+  tags: 
+    - shared-runner-3
+  before_script:
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client git -y )'
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan ${SSH_HOST} >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - ssh $SSH_USER@$SSH_HOST "docker-compose pull cool-api && docker-compose up -d cool-api"
+  environment:
+    name: prod
+  only:
+    refs:
+      - develop
+      - master
+  except:
+    refs:
+      - /^feature/.*$/
+  dependencies:
+    - package
+  when: manual

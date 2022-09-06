@@ -1,0 +1,36 @@
+---
+version: '3.7'
+services:
+  cooler:
+    build: .
+    container_name: api-cool
+    restart: always
+    env_file:
+     - .env
+    ports:
+      - 8080:8080
+    networks:
+      - database
+
+  db:
+    image: postgres:13.1-alpine
+    hostname: postgres
+    restart: always
+    ports:
+      - 5432:5432
+    env_file:
+      - .env
+    volumes:
+      - data:/var/lib/postgresql/data/
+    networks:
+      - database
+
+volumes:
+  data:
+    driver: local
+    name: data
+
+networks:
+  database:
+    driver: bridge
+    name: database

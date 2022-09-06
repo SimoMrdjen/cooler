@@ -1,0 +1,10 @@
+mail:
+  smtp:
+    host: 127.0.0.1
+    ssl:
+      trust: smtp.gmail.com
+    port: 3025
+
+  sender: "mail@mail.com"
+  username: "mail@mail.com"
+  password: "123abc"
